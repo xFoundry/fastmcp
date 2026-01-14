@@ -77,6 +77,8 @@ export default function HomePage() {
   const [isTokenLoading, setIsTokenLoading] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [connectServer, setConnectServer] = useState<ServerRecord | null>(null);
+  const [connectToken, setConnectToken] = useState<string | null>(null);
+  const [isConnectTokenLoading, setIsConnectTokenLoading] = useState(false);
 
   const hasServers = servers.length > 0;
   const sortServers = useMemo(
@@ -187,7 +189,9 @@ export default function HomePage() {
 
   const openConnect = (server: ServerRecord) => {
     setConnectServer(server);
+    setConnectToken(null);
     setConnectOpen(true);
+    void loadConnectToken(server.id);
   };
 
   const copySnippet = async (snippet: string) => {
@@ -198,23 +202,28 @@ export default function HomePage() {
     ? connectServer.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
     : "fastmcp-server";
 
-  const claudeCodeCommand = `fastmcp install claude-code path/to/server.py --server-name "${connectServer?.name ?? "FastMCP Server"}"`;
-  const claudeDesktopCommand = `fastmcp install claude-desktop path/to/server.py --server-name "${connectServer?.name ?? "FastMCP Server"}"`;
-  const cursorCommand = `fastmcp install cursor path/to/server.py`;
-  const claudeDesktopConfig = `{
+  const connectUrl = connectServer?.endpoint ?? "https://example.com/mcp";
+  const claudeCodeCommand = `claude mcp add --transport http ${serverSlug} ${connectUrl}${
+    connectToken ? ` --header "Authorization: Bearer ${connectToken}"` : ""
+  }`;
+  const claudeDesktopSnippet = `URL: ${connectUrl}${
+    connectToken ? `\nHeader: Authorization: Bearer ${connectToken}` : ""
+  }`;
+  const cursorConfig = `{
   "mcpServers": {
     "${serverSlug}": {
-      "command": "python",
-      "args": ["path/to/server.py"]
+      "type": "http",
+      "url": "${connectUrl}"${
+        connectToken
+          ? `,
+      "headers": {
+        "Authorization": "Bearer ${connectToken}"
+      }`
+          : ""
+      }
     }
   }
 }`;
-  const proxySnippet = `from fastmcp.server import create_proxy
-
-proxy = create_proxy("${connectServer?.endpoint ?? "https://example.com/mcp"}", name="${connectServer?.name ?? "Remote Server Proxy"}")
-
-if __name__ == "__main__":
-    proxy.run()`;
 
   const loadToken = async () => {
     if (!editTargetId) {
@@ -233,6 +242,22 @@ if __name__ == "__main__":
       setIsTokenVisible(true);
     } finally {
       setIsTokenLoading(false);
+    }
+  };
+
+  const loadConnectToken = async (serverId: string) => {
+    setIsConnectTokenLoading(true);
+    try {
+      const response = await fetch(`/api/servers/${serverId}/token`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) {
+        setErrorMessage(data.error ?? "Failed to load token.");
+        return;
+      }
+      setErrorMessage(null);
+      setConnectToken(data.authToken ?? null);
+    } finally {
+      setIsConnectTokenLoading(false);
     }
   };
 
@@ -612,42 +637,27 @@ if __name__ == "__main__":
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Claude Desktop command</p>
-                <Button variant="outline" size="sm" onClick={() => copySnippet(claudeDesktopCommand)}>
+                <p className="text-sm font-medium">Claude Desktop connector</p>
+                <Button variant="outline" size="sm" onClick={() => copySnippet(claudeDesktopSnippet)}>
                   Copy
                 </Button>
               </div>
-              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{claudeDesktopCommand}</pre>
+              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{claudeDesktopSnippet}</pre>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Claude Desktop manual config</p>
-                <Button variant="outline" size="sm" onClick={() => copySnippet(claudeDesktopConfig)}>
+                <p className="text-sm font-medium">Cursor config</p>
+                <Button variant="outline" size="sm" onClick={() => copySnippet(cursorConfig)}>
                   Copy
                 </Button>
               </div>
-              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{claudeDesktopConfig}</pre>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Claude Desktop remote proxy</p>
-                <Button variant="outline" size="sm" onClick={() => copySnippet(proxySnippet)}>
-                  Copy
-                </Button>
-              </div>
-              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{proxySnippet}</pre>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Cursor command</p>
-                <Button variant="outline" size="sm" onClick={() => copySnippet(cursorCommand)}>
-                  Copy
-                </Button>
-              </div>
-              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{cursorCommand}</pre>
+              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{cursorConfig}</pre>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              {isConnectTokenLoading ? "Loading token..." : connectToken ? "Token included" : "No token"}
+            </div>
             <Button variant="ghost" onClick={() => setConnectOpen(false)}>
               Close
             </Button>
