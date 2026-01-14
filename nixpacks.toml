@@ -1,0 +1,12 @@
+[phases.setup]
+nixPkgs = ["python312", "gcc"]
+
+[phases.install]
+cmds = ["pip install ."]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "python railway_server.py"
+
