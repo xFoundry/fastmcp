@@ -75,6 +75,8 @@ export default function HomePage() {
   const [existingToken, setExistingToken] = useState<string | null>(null);
   const [isTokenVisible, setIsTokenVisible] = useState(false);
   const [isTokenLoading, setIsTokenLoading] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [connectServer, setConnectServer] = useState<ServerRecord | null>(null);
 
   const hasServers = servers.length > 0;
   const sortServers = useMemo(
@@ -182,6 +184,37 @@ export default function HomePage() {
     setIsTokenVisible(false);
     setEditOpen(true);
   };
+
+  const openConnect = (server: ServerRecord) => {
+    setConnectServer(server);
+    setConnectOpen(true);
+  };
+
+  const copySnippet = async (snippet: string) => {
+    await navigator.clipboard.writeText(snippet);
+  };
+
+  const serverSlug = connectServer?.name
+    ? connectServer.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
+    : "fastmcp-server";
+
+  const claudeCodeCommand = `fastmcp install claude-code path/to/server.py --server-name "${connectServer?.name ?? "FastMCP Server"}"`;
+  const claudeDesktopCommand = `fastmcp install claude-desktop path/to/server.py --server-name "${connectServer?.name ?? "FastMCP Server"}"`;
+  const cursorCommand = `fastmcp install cursor path/to/server.py`;
+  const claudeDesktopConfig = `{
+  "mcpServers": {
+    "${serverSlug}": {
+      "command": "python",
+      "args": ["path/to/server.py"]
+    }
+  }
+}`;
+  const proxySnippet = `from fastmcp.server import create_proxy
+
+proxy = create_proxy("${connectServer?.endpoint ?? "https://example.com/mcp"}", name="${connectServer?.name ?? "Remote Server Proxy"}")
+
+if __name__ == "__main__":
+    proxy.run()`;
 
   const loadToken = async () => {
     if (!editTargetId) {
@@ -404,6 +437,9 @@ export default function HomePage() {
                       <Button variant="outline" size="sm" onClick={() => openEdit(server)}>
                         Edit
                       </Button>
+                      <Button variant="outline" size="sm" onClick={() => openConnect(server)}>
+                        Connect
+                      </Button>
                       <Button variant="outline" size="sm" onClick={() => openLogs(server)}>
                         Logs
                       </Button>
@@ -551,6 +587,69 @@ export default function HomePage() {
             </Button>
             <Button onClick={handleEdit} disabled={!editDraft}>
               Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={connectOpen} onOpenChange={setConnectOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Connect this server</DialogTitle>
+            <DialogDescription>
+              Use these snippets to add the server to Claude Code, Claude Desktop, or Cursor.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Claude Code command</p>
+                <Button variant="outline" size="sm" onClick={() => copySnippet(claudeCodeCommand)}>
+                  Copy
+                </Button>
+              </div>
+              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{claudeCodeCommand}</pre>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Claude Desktop command</p>
+                <Button variant="outline" size="sm" onClick={() => copySnippet(claudeDesktopCommand)}>
+                  Copy
+                </Button>
+              </div>
+              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{claudeDesktopCommand}</pre>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Claude Desktop manual config</p>
+                <Button variant="outline" size="sm" onClick={() => copySnippet(claudeDesktopConfig)}>
+                  Copy
+                </Button>
+              </div>
+              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{claudeDesktopConfig}</pre>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Claude Desktop remote proxy</p>
+                <Button variant="outline" size="sm" onClick={() => copySnippet(proxySnippet)}>
+                  Copy
+                </Button>
+              </div>
+              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{proxySnippet}</pre>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Cursor command</p>
+                <Button variant="outline" size="sm" onClick={() => copySnippet(cursorCommand)}>
+                  Copy
+                </Button>
+              </div>
+              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{cursorCommand}</pre>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConnectOpen(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
