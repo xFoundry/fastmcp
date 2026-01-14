@@ -1,8 +1,9 @@
 export function getControlPlaneUrl(): string | null {
-  const baseUrl = process.env.CONTROL_PLANE_API_URL ?? "";
-  if (!baseUrl) {
+  const raw = process.env.CONTROL_PLANE_API_URL ?? "";
+  if (!raw) {
     return null;
   }
-  return baseUrl.replace(/\/$/, "");
+  const withScheme = raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`;
+  return withScheme.replace(/\/$/, "");
 }
 
