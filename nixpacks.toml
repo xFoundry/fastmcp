@@ -2,11 +2,15 @@
 nixPkgs = ["python312", "gcc"]
 
 [phases.install]
-cmds = ["pip install ."]
+cmds = [
+    "python -m venv /opt/venv",
+    ". /opt/venv/bin/activate && python -m pip install -U pip",
+    ". /opt/venv/bin/activate && python -m pip install .",
+]
 
 [phases.build]
 cmds = []
 
 [start]
-cmd = "python railway_server.py"
+cmd = "/opt/venv/bin/python railway_server.py"
 
