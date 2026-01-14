@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field
 from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport
 
-
 DATABASE_PATH = os.getenv("CONTROL_PLANE_DB", "control-plane.db")
 
 
@@ -238,7 +237,9 @@ def delete_server(server_id: str) -> dict[str, Any]:
 @app.put("/servers/{server_id}")
 def update_server(server_id: str, payload: ServerUpdate) -> dict[str, ServerRecord]:
     with get_conn() as conn:
-        row = conn.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM servers WHERE id = ?", (server_id,)
+        ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Server not found.")
     existing_type = row["type"]
@@ -248,7 +249,9 @@ def update_server(server_id: str, payload: ServerUpdate) -> dict[str, ServerReco
     if "endpoint" in payload.model_fields_set and payload.endpoint:
         target_type = payload.type or existing_type
         if target_type != "stdio" and not payload.endpoint.startswith("http"):
-            raise HTTPException(status_code=400, detail="Endpoint must start with http(s).")
+            raise HTTPException(
+                status_code=400, detail="Endpoint must start with http(s)."
+            )
         updates["endpoint"] = payload.endpoint
     if "type" in payload.model_fields_set and payload.type:
         updates["type"] = payload.type
@@ -263,7 +266,9 @@ def update_server(server_id: str, payload: ServerUpdate) -> dict[str, ServerReco
             )
         append_log(server_id, "info", "Server updated.")
     with get_conn() as conn:
-        row = conn.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM servers WHERE id = ?", (server_id,)
+        ).fetchone()
     return {"server": row_to_server(row)}
 
 
@@ -294,7 +299,9 @@ def get_token(server_id: str) -> dict[str, Any]:
 @app.post("/servers/{server_id}/check")
 async def check_server(server_id: str) -> dict[str, Any]:
     with get_conn() as conn:
-        row = conn.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM servers WHERE id = ?", (server_id,)
+        ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Server not found.")
     server = row_to_server(row)
@@ -322,4 +329,3 @@ async def check_server(server_id: str) -> dict[str, Any]:
         "latency_ms": result.latency_ms,
         "detail": result.detail,
     }
-
