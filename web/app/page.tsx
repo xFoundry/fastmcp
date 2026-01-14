@@ -72,6 +72,9 @@ export default function HomePage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editDraft, setEditDraft] = useState<NewServerDraft | null>(null);
   const [editTargetId, setEditTargetId] = useState<string | null>(null);
+  const [existingToken, setExistingToken] = useState<string | null>(null);
+  const [isTokenVisible, setIsTokenVisible] = useState(false);
+  const [isTokenLoading, setIsTokenLoading] = useState(false);
 
   const hasServers = servers.length > 0;
   const sortServers = useMemo(
@@ -175,7 +178,36 @@ export default function HomePage() {
       type: server.type,
       authToken: ""
     });
+    setExistingToken(null);
+    setIsTokenVisible(false);
     setEditOpen(true);
+  };
+
+  const loadToken = async () => {
+    if (!editTargetId) {
+      return;
+    }
+    setIsTokenLoading(true);
+    try {
+      const response = await fetch(`/api/servers/${editTargetId}/token`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) {
+        setErrorMessage(data.error ?? "Failed to load token.");
+        return;
+      }
+      setErrorMessage(null);
+      setExistingToken(data.authToken ?? null);
+      setIsTokenVisible(true);
+    } finally {
+      setIsTokenLoading(false);
+    }
+  };
+
+  const copyToken = async () => {
+    if (!existingToken) {
+      return;
+    }
+    await navigator.clipboard.writeText(existingToken);
   };
 
   const handleEdit = async () => {
@@ -481,6 +513,35 @@ export default function HomePage() {
                     setEditDraft({ ...editDraft, authToken: event.target.value })
                   }
                 />
+              </div>
+              <div className="grid gap-2">
+                <Label>Existing token</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={existingToken ?? "Hidden"}
+                    readOnly
+                    type={isTokenVisible ? "text" : "password"}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={loadToken}
+                    disabled={isTokenLoading}
+                  >
+                    {isTokenLoading ? "Loading..." : isTokenVisible ? "Refresh" : "Reveal"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={copyToken}
+                    disabled={!existingToken}
+                  >
+                    Copy
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Tokens stay hidden unless you reveal them.
+                </p>
               </div>
             </div>
           ) : null}

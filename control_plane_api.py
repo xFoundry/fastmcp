@@ -277,6 +277,20 @@ def get_logs(server_id: str) -> dict[str, list[LogRecord]]:
     return {"logs": [row_to_log(row) for row in rows]}
 
 
+@app.get("/servers/{server_id}/token")
+def get_token(server_id: str) -> dict[str, Any]:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT auth_token FROM servers WHERE id = ?", (server_id,)
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Server not found.")
+    token = row["auth_token"]
+    if not token:
+        return {"authToken": None}
+    return {"authToken": token}
+
+
 @app.post("/servers/{server_id}/check")
 async def check_server(server_id: str) -> dict[str, Any]:
     with get_conn() as conn:
