@@ -1,7 +1,7 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "pip install ."
+buildCommand = ". /opt/venv/bin/activate && python -m pip install ."
 
 [deploy]
-startCommand = "python railway_server.py"
+startCommand = "/opt/venv/bin/python railway_server.py"
 
