@@ -625,7 +625,7 @@ export default function HomePage() {
               Use these snippets to add the server to Claude Code, Claude Desktop, or Cursor.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-6">
+          <div className="grid max-h-[70vh] gap-6 overflow-y-auto pr-1">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Claude Code command</p>
@@ -633,7 +633,9 @@ export default function HomePage() {
                   Copy
                 </Button>
               </div>
-              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{claudeCodeCommand}</pre>
+              <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-md border bg-muted/30 p-3 text-xs">
+                {claudeCodeCommand}
+              </pre>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -642,7 +644,9 @@ export default function HomePage() {
                   Copy
                 </Button>
               </div>
-              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{claudeDesktopSnippet}</pre>
+              <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-md border bg-muted/30 p-3 text-xs">
+                {claudeDesktopSnippet}
+              </pre>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -651,7 +655,9 @@ export default function HomePage() {
                   Copy
                 </Button>
               </div>
-              <pre className="rounded-md border bg-muted/30 p-3 text-xs">{cursorConfig}</pre>
+              <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-md border bg-muted/30 p-3 text-xs">
+                {cursorConfig}
+              </pre>
             </div>
           </div>
           <DialogFooter className="flex items-center justify-between">
