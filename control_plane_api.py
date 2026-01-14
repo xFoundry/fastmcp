@@ -32,8 +32,20 @@ class ServerCreate(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-class ServerRecord(ServerCreate):
+class ServerUpdate(BaseModel):
+    name: str | None = None
+    endpoint: str | None = None
+    type: str | None = Field(default=None, pattern="^(stdio|http|sse)$")
+    auth_token: str | None = Field(default=None, alias="authToken")
+
+    model_config = {"populate_by_name": True}
+
+
+class ServerRecord(BaseModel):
     id: str
+    name: str
+    endpoint: str
+    type: str
     createdAt: str
     lastCheckAt: str | None = None
     lastCheckStatus: str | None = None
@@ -182,6 +194,8 @@ def list_servers() -> dict[str, list[ServerRecord]]:
 
 @app.post("/servers")
 def create_server(payload: ServerCreate) -> dict[str, ServerRecord]:
+    if payload.type != "stdio" and not payload.endpoint.startswith("http"):
+        raise HTTPException(status_code=400, detail="Endpoint must start with http(s).")
     server_id = os.urandom(8).hex()
     created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     with get_conn() as conn:
@@ -219,6 +233,38 @@ def delete_server(server_id: str) -> dict[str, Any]:
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="Server not found.")
     return {"ok": True}
+
+
+@app.put("/servers/{server_id}")
+def update_server(server_id: str, payload: ServerUpdate) -> dict[str, ServerRecord]:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Server not found.")
+    existing_type = row["type"]
+    updates: dict[str, Any] = {}
+    if "name" in payload.model_fields_set and payload.name:
+        updates["name"] = payload.name
+    if "endpoint" in payload.model_fields_set and payload.endpoint:
+        target_type = payload.type or existing_type
+        if target_type != "stdio" and not payload.endpoint.startswith("http"):
+            raise HTTPException(status_code=400, detail="Endpoint must start with http(s).")
+        updates["endpoint"] = payload.endpoint
+    if "type" in payload.model_fields_set and payload.type:
+        updates["type"] = payload.type
+    if "auth_token" in payload.model_fields_set:
+        updates["auth_token"] = payload.auth_token or None
+    if updates:
+        set_clause = ", ".join(f"{column} = ?" for column in updates)
+        with get_conn() as conn:
+            conn.execute(
+                f"UPDATE servers SET {set_clause} WHERE id = ?",
+                (*updates.values(), server_id),
+            )
+        append_log(server_id, "info", "Server updated.")
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
+    return {"server": row_to_server(row)}
 
 
 @app.get("/servers/{server_id}/logs")

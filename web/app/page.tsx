@@ -68,6 +68,10 @@ export default function HomePage() {
   const [logsOpen, setLogsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isChecking, setIsChecking] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDraft, setEditDraft] = useState<NewServerDraft | null>(null);
+  const [editTargetId, setEditTargetId] = useState<string | null>(null);
 
   const hasServers = servers.length > 0;
   const sortServers = useMemo(
@@ -80,6 +84,11 @@ export default function HomePage() {
     try {
       const response = await fetch("/api/servers", { cache: "no-store" });
       const data = await response.json();
+      if (!response.ok) {
+        setErrorMessage(data.error ?? "Failed to load servers.");
+        return;
+      }
+      setErrorMessage(null);
       setServers(data.servers ?? []);
     } finally {
       setIsLoading(false);
@@ -102,25 +111,43 @@ export default function HomePage() {
       ...draft,
       authToken: draft.authToken?.trim() || undefined
     };
-    await fetch("/api/servers", {
+    const response = await fetch("/api/servers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
+    const data = await response.json();
+    if (!response.ok) {
+      setErrorMessage(data.error ?? "Failed to add server.");
+      return;
+    }
+    setErrorMessage(null);
     resetDraft();
     setIsDialogOpen(false);
     await loadServers();
   };
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/servers/${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/servers/${id}`, { method: "DELETE" });
+    if (!response.ok) {
+      const data = await response.json();
+      setErrorMessage(data.error ?? "Failed to delete server.");
+      return;
+    }
+    setErrorMessage(null);
     await loadServers();
   };
 
   const handleCheck = async (id: string) => {
     setIsChecking(id);
     try {
-      await fetch(`/api/servers/${id}/check`, { method: "POST" });
+      const response = await fetch(`/api/servers/${id}/check`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        setErrorMessage(data.error ?? "Check failed.");
+        return;
+      }
+      setErrorMessage(null);
       await loadServers();
     } finally {
       setIsChecking(null);
@@ -130,9 +157,52 @@ export default function HomePage() {
   const openLogs = async (server: ServerRecord) => {
     const response = await fetch(`/api/servers/${server.id}/logs`, { cache: "no-store" });
     const data = await response.json();
+    if (!response.ok) {
+      setErrorMessage(data.error ?? "Failed to load logs.");
+      return;
+    }
+    setErrorMessage(null);
     setSelectedLogs(data.logs ?? []);
     setSelectedServer(server);
     setLogsOpen(true);
+  };
+
+  const openEdit = (server: ServerRecord) => {
+    setEditTargetId(server.id);
+    setEditDraft({
+      name: server.name,
+      endpoint: server.endpoint,
+      type: server.type,
+      authToken: ""
+    });
+    setEditOpen(true);
+  };
+
+  const handleEdit = async () => {
+    if (!editDraft || !editTargetId) {
+      return;
+    }
+    const payload = {
+      name: editDraft.name,
+      endpoint: editDraft.endpoint,
+      type: editDraft.type,
+      authToken: editDraft.authToken?.trim() || undefined
+    };
+    const response = await fetch(`/api/servers/${editTargetId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setErrorMessage(data.error ?? "Failed to update server.");
+      return;
+    }
+    setErrorMessage(null);
+    setEditOpen(false);
+    setEditDraft(null);
+    setEditTargetId(null);
+    await loadServers();
   };
 
   return (
@@ -220,6 +290,11 @@ export default function HomePage() {
           </Dialog>
         </div>
       </header>
+      {errorMessage ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {errorMessage}
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -272,6 +347,11 @@ export default function HomePage() {
                               {server.lastCheckLatencyMs}ms
                             </span>
                           ) : null}
+                          {server.lastCheckDetail ? (
+                            <span className="text-xs text-muted-foreground">
+                              {server.lastCheckDetail}
+                            </span>
+                          ) : null}
                         </div>
                       ) : (
                         <Badge variant="muted">unknown</Badge>
@@ -288,6 +368,9 @@ export default function HomePage() {
                         disabled={isChecking === server.id}
                       >
                         {isChecking === server.id ? "Checking..." : "Check"}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => openEdit(server)}>
+                        Edit
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => openLogs(server)}>
                         Logs
@@ -337,6 +420,76 @@ export default function HomePage() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setLogsOpen(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit MCP server</DialogTitle>
+            <DialogDescription>Update the server details and authentication.</DialogDescription>
+          </DialogHeader>
+          {editDraft ? (
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-name">Name</Label>
+                <Input
+                  id="edit-name"
+                  value={editDraft.name}
+                  onChange={(event) =>
+                    setEditDraft({ ...editDraft, name: event.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-endpoint">Endpoint</Label>
+                <Input
+                  id="edit-endpoint"
+                  value={editDraft.endpoint}
+                  onChange={(event) =>
+                    setEditDraft({ ...editDraft, endpoint: event.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-type">Transport</Label>
+                <select
+                  id="edit-type"
+                  value={editDraft.type}
+                  onChange={(event) =>
+                    setEditDraft({
+                      ...editDraft,
+                      type: event.target.value as ServerRecord["type"]
+                    })
+                  }
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="http">HTTP</option>
+                  <option value="sse">SSE</option>
+                  <option value="stdio">STDIO</option>
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-token">API key / bearer token</Label>
+                <Input
+                  id="edit-token"
+                  placeholder="Leave blank to keep existing"
+                  value={editDraft.authToken}
+                  onChange={(event) =>
+                    setEditDraft({ ...editDraft, authToken: event.target.value })
+                  }
+                />
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEdit} disabled={!editDraft}>
+              Save changes
             </Button>
           </DialogFooter>
         </DialogContent>
