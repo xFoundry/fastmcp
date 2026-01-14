@@ -3,5 +3,5 @@ builder = "NIXPACKS"
 buildCommand = ". /opt/venv/bin/activate && python -m pip install ."
 
 [deploy]
-startCommand = "/opt/venv/bin/python railway_server.py"
+startCommand = "./scripts/railway-start.sh"
 
