@@ -6,6 +6,7 @@ authors = [{ name = "Jeremiah Lowin" }]
 dependencies = [
     "python-dotenv>=1.1.0",
     "exceptiongroup>=1.2.2",
+    "fastapi>=0.115.12",
     "httpx>=0.28.1",
     "mcp>=1.24.0,<2.0",
     "openapi-pydantic>=0.5.1",
