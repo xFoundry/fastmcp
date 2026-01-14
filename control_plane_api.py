@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from fastmcp import Client
+from fastmcp.client.transports import StreamableHttpTransport
 
 
 DATABASE_PATH = os.getenv("CONTROL_PLANE_DB", "control-plane.db")
@@ -26,6 +27,9 @@ class ServerCreate(BaseModel):
     name: str
     endpoint: str
     type: str = Field(pattern="^(stdio|http|sse)$")
+    auth_token: str | None = Field(default=None, alias="authToken")
+
+    model_config = {"populate_by_name": True}
 
 
 class ServerRecord(ServerCreate):
@@ -35,6 +39,7 @@ class ServerRecord(ServerCreate):
     lastCheckStatus: str | None = None
     lastCheckLatencyMs: int | None = None
     lastCheckDetail: str | None = None
+    authConfigured: bool = False
 
 
 class LogRecord(BaseModel):
@@ -84,10 +89,15 @@ def init_db() -> None:
                 last_check_at TEXT,
                 last_check_status TEXT,
                 last_check_latency_ms INTEGER,
-                last_check_detail TEXT
+                last_check_detail TEXT,
+                auth_token TEXT
             )
             """
         )
+        try:
+            conn.execute("ALTER TABLE servers ADD COLUMN auth_token TEXT")
+        except sqlite3.OperationalError:
+            pass
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS logs (
@@ -114,6 +124,7 @@ def row_to_server(row: sqlite3.Row) -> ServerRecord:
         lastCheckStatus=data["last_check_status"],
         lastCheckLatencyMs=data["last_check_latency_ms"],
         lastCheckDetail=data["last_check_detail"],
+        authConfigured=bool(data.get("auth_token")),
     )
 
 
@@ -147,10 +158,13 @@ def append_log(server_id: str, level: str, message: str) -> None:
         )
 
 
-async def run_check(server: ServerRecord) -> CheckResult:
+async def run_check(server: ServerRecord, auth_token: str | None) -> CheckResult:
     start = time.perf_counter()
     try:
-        async with Client(server.endpoint) as client:
+        if server.type == "stdio":
+            raise ValueError("STDIO transport is not supported by the control plane.")
+        transport = StreamableHttpTransport(server.endpoint, auth=auth_token)
+        async with Client(transport) as client:
             await client.list_tools()
         latency = int((time.perf_counter() - start) * 1000)
         return CheckResult(ok=True, latency_ms=latency, detail="Connection succeeded.")
@@ -173,10 +187,17 @@ def create_server(payload: ServerCreate) -> dict[str, ServerRecord]:
     with get_conn() as conn:
         conn.execute(
             """
-            INSERT INTO servers (id, name, endpoint, type, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO servers (id, name, endpoint, type, created_at, auth_token)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (server_id, payload.name, payload.endpoint, payload.type, created_at),
+            (
+                server_id,
+                payload.name,
+                payload.endpoint,
+                payload.type,
+                created_at,
+                payload.auth_token,
+            ),
         )
     append_log(server_id, "info", f"Server {payload.name} registered.")
     return {
@@ -186,6 +207,7 @@ def create_server(payload: ServerCreate) -> dict[str, ServerRecord]:
             endpoint=payload.endpoint,
             type=payload.type,
             createdAt=created_at,
+            authConfigured=bool(payload.auth_token),
         )
     }
 
@@ -216,7 +238,8 @@ async def check_server(server_id: str) -> dict[str, Any]:
     if row is None:
         raise HTTPException(status_code=404, detail="Server not found.")
     server = row_to_server(row)
-    result = await run_check(server)
+    auth_token = row["auth_token"]
+    result = await run_check(server, auth_token)
     status = "healthy" if result.ok else "unreachable"
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     with get_conn() as conn:

@@ -35,6 +35,7 @@ type ServerRecord = {
   lastCheckStatus?: string | null;
   lastCheckLatencyMs?: number | null;
   lastCheckDetail?: string | null;
+  authConfigured?: boolean;
 };
 
 type ServerLog = {
@@ -48,12 +49,14 @@ type NewServerDraft = {
   name: string;
   endpoint: string;
   type: ServerRecord["type"];
+  authToken?: string;
 };
 
 const emptyDraft: NewServerDraft = {
   name: "",
   endpoint: "",
-  type: "http"
+  type: "http",
+  authToken: ""
 };
 
 export default function HomePage() {
@@ -95,10 +98,14 @@ export default function HomePage() {
     if (!draft.name.trim() || !draft.endpoint.trim()) {
       return;
     }
+    const payload = {
+      ...draft,
+      authToken: draft.authToken?.trim() || undefined
+    };
     await fetch("/api/servers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(draft)
+      body: JSON.stringify(payload)
     });
     resetDraft();
     setIsDialogOpen(false);
@@ -188,6 +195,18 @@ export default function HomePage() {
                     <option value="stdio">STDIO</option>
                   </select>
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="server-token">API key / bearer token</Label>
+                  <Input
+                    id="server-token"
+                    placeholder="Optional"
+                    value={draft.authToken}
+                    onChange={(event) => setDraft({ ...draft, authToken: event.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Stored in the control plane and used for connectivity checks.
+                  </p>
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>
@@ -219,6 +238,7 @@ export default function HomePage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Endpoint</TableHead>
                   <TableHead>Transport</TableHead>
+                  <TableHead>Auth</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -231,6 +251,13 @@ export default function HomePage() {
                     <TableCell className="text-muted-foreground">{server.endpoint}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">{server.type.toUpperCase()}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {server.authConfigured ? (
+                        <Badge variant="outline">Auth</Badge>
+                      ) : (
+                        <Badge variant="muted">No auth</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       {server.lastCheckStatus ? (

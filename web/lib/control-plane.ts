@@ -3,7 +3,10 @@ export function getControlPlaneUrl(): string | null {
   if (!raw) {
     return null;
   }
-  const withScheme = raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`;
-  return withScheme.replace(/\/$/, "");
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    return raw.replace(/\/$/, "");
+  }
+  const scheme = raw.endsWith(".railway.internal") ? "http" : "https";
+  return `${scheme}://${raw}`.replace(/\/$/, "");
 }
 
