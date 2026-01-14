@@ -6,6 +6,7 @@ export function getControlPlaneUrl(): string | null {
   if (raw.startsWith("http://") || raw.startsWith("https://")) {
     return raw.replace(/\/$/, "");
   }
-  return `http://${raw}`.replace(/\/$/, "");
+  const host = raw.includes(":") ? raw : `${raw}:8080`;
+  return `http://${host}`.replace(/\/$/, "");
 }
 
