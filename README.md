@@ -385,6 +385,16 @@ the provided `railway_server.py` entrypoint. Use `MCP_AUTH_TOKEN` as the control
 `authToken` when registering the server. See the [Airtable MCP server docs](https://github.com/domdomegg/airtable-mcp-server)
 for tool details.
 
+#### Airtable MCP usage tips
+
+- Discovery flow: `list_bases → list_tables → describe_table`.
+- `search_records` only searches text fields. If there are no text fields, it will error; use `list_records` + `filterByFormula` instead.
+- `filterByFormula` needs Airtable formula syntax. Example: `SEARCH("defenx", LOWER({Team Name}))`.
+- Linked record fields return record IDs; lookup/rollup fields often provide the display values you want.
+- For upcoming items, add `sort` on date fields and use filters like `IS_AFTER({Scheduled Start}, NOW())` (time zone can be client vs UTC).
+- Increase `maxRecords` when you expect many matches to avoid missing results.
+- “No text fields available to search” implies you must pivot to `list_records` + formula.
+
 Learn more in the [**Deployment Documentation**](https://gofastmcp.com/deployment).
 
 ## Advanced Features
