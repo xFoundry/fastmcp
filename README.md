@@ -380,8 +380,9 @@ mcp.run(transport="http", host="0.0.0.0", port=8000)
 ### Railway Airtable MCP proxy
 
 This repo includes a Railway entrypoint that exposes the Airtable MCP server through FastMCP.
-Set `AIRTABLE_API_KEY` (and optionally `AIRTABLE_API_URL`) and deploy using the provided
-`railway_server.py` entrypoint. See the [Airtable MCP server docs](https://github.com/domdomegg/airtable-mcp-server)
+Set `AIRTABLE_API_KEY`, `MCP_AUTH_TOKEN` (and optionally `AIRTABLE_API_URL`) and deploy using
+the provided `railway_server.py` entrypoint. Use `MCP_AUTH_TOKEN` as the control plane
+`authToken` when registering the server. See the [Airtable MCP server docs](https://github.com/domdomegg/airtable-mcp-server)
 for tool details.
 
 Learn more in the [**Deployment Documentation**](https://gofastmcp.com/deployment).

@@ -4,6 +4,7 @@ import os
 
 from fastmcp import FastMCP
 from fastmcp.server import create_proxy
+from fastmcp.server.auth.providers.debug import DebugTokenVerifier
 
 
 def _build_airtable_env() -> dict[str, str]:
@@ -20,6 +21,13 @@ def _build_airtable_env() -> dict[str, str]:
     return env
 
 
+def _build_gateway_auth() -> DebugTokenVerifier:
+    auth_token = os.getenv("MCP_AUTH_TOKEN")
+    if not auth_token:
+        raise RuntimeError("MCP_AUTH_TOKEN is required to protect the MCP gateway.")
+    return DebugTokenVerifier(validate=lambda token: token == auth_token)
+
+
 def _create_airtable_proxy() -> FastMCP:
     config = {
         "mcpServers": {
@@ -33,7 +41,7 @@ def _create_airtable_proxy() -> FastMCP:
     return create_proxy(config, name="Airtable MCP Proxy")
 
 
-mcp = FastMCP("Airtable MCP Gateway")
+mcp = FastMCP("Airtable MCP Gateway", auth=_build_gateway_auth())
 mcp.mount(_create_airtable_proxy())
 
 
